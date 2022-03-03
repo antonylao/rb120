@@ -8,6 +8,8 @@ In the same way, making subclasses for computers permitted to simplify the set_b
 # rubocop: enable Layout/LineLength
 
 module Interactivable
+  private
+
   def prompt(message)
     puts "=> #{message}"
   end
@@ -36,7 +38,7 @@ module Interactivable
       break if ['y', 'n', 'yes', 'no'].include?(answer)
       prompt "Sorry, must be y or n"
     end
-    answer
+    answer[0]
   end
 
   # rubocop: disable Metrics/MethodLength
@@ -76,15 +78,6 @@ class Move
     [Rock, Paper, Scissors, Lizard, Spock]
   end
 
-  def comparable?(other_move)
-    Move.subclasses.include?(self.class) &&
-      Move.subclasses.include?(other_move.class)
-  end
-
-  def to_s
-    self.class.to_s.downcase
-  end
-
   def >(other_move)
     unless comparable?(other_move)
       puts :not_comparable
@@ -94,13 +87,15 @@ class Move
     self.class.win_against.include?(other_move.class)
   end
 
-  def <(other_move)
-    unless comparable?(other_move)
-      puts :not_comparable
-      return nil
-    end
+  def to_s
+    self.class.to_s.downcase
+  end
 
-    self.class.lose_against.include?(other_move.class)
+  private
+
+  def comparable?(other_move)
+    Move.subclasses.include?(self.class) &&
+      Move.subclasses.include?(other_move.class)
   end
 end
 
@@ -108,19 +103,11 @@ class Rock < Move
   def self.win_against
     [Lizard, Scissors]
   end
-
-  def self.lose_against
-    [Paper, Spock]
-  end
 end
 
 class Paper < Move
   def self.win_against
     [Rock, Spock]
-  end
-
-  def self.lose_against
-    [Scissors, Lizard]
   end
 end
 
@@ -128,19 +115,11 @@ class Scissors < Move
   def self.win_against
     [Paper, Lizard]
   end
-
-  def self.lose_against
-    [Rock, Spock]
-  end
 end
 
 class Lizard < Move
   def self.win_against
     [Paper, Spock]
-  end
-
-  def self.lose_against
-    [Rock, Scissors]
   end
 end
 
@@ -148,14 +127,11 @@ class Spock < Move
   def self.win_against
     [Scissors, Rock]
   end
-
-  def self.lose_against
-    [Paper, Lizard]
-  end
 end
 
 class Player
-  attr_accessor :move, :name, :score, :move_history
+  attr_accessor :score
+  attr_reader :name, :move, :move_history
 
   def initialize
     @score = 0
@@ -163,12 +139,27 @@ class Player
     set_name
   end
 
+  private
+
+  attr_writer :name, :move, :move_history
+
   def add_move_to_history
     move_history.prepend(move.to_s)
   end
 end
 
 class Human < Player
+  include Interactivable
+
+  def choose
+    choice = input_choice(Move::VALUES)
+
+    self.move = Move.create_object(choice.to_sym)
+    add_move_to_history
+  end
+
+  private
+
   def set_name
     n = ''
     loop do
@@ -178,13 +169,6 @@ class Human < Player
       prompt "Sorry, must enter a value."
     end
     self.name = n
-  end
-
-  def choose
-    choice = input_choice(Move::VALUES)
-
-    self.move = Move.create_object(choice.to_sym)
-    add_move_to_history
   end
 end
 
@@ -202,10 +186,6 @@ class Computer < Player
     set_behavior
   end
 
-  def set_name
-    self.name = self.class.to_s
-  end
-
   def choose
     self.move = Move.create_object(behavior.choose_move)
     add_move_to_history
@@ -214,6 +194,10 @@ class Computer < Player
   private
 
   attr_accessor :behavior
+
+  def set_name
+    self.name = self.class.to_s
+  end
 end
 
 class Behavior
@@ -226,10 +210,6 @@ class Behavior
       spock: sp
     }
     puts "not valid cpu behavior" unless valid?
-  end
-
-  def valid?
-    @ratios.values.sum == 1
   end
 
   def choose_move
@@ -246,33 +226,49 @@ class Behavior
       return move if random_nb < total_ratio
     end
   end
+
+  private
+
+  def valid?
+    @ratios.values.sum == 1
+  end
 end
 
 class R2D2 < Computer
+  private
+
   def set_behavior
     self.behavior = Behavior.new(1, 0, 0, 0, 0)
   end
 end
 
 class Hal < Computer
+  private
+
   def set_behavior
     self.behavior = Behavior.new(0.3, 0, 0.7, 0, 0)
   end
 end
 
 class Chappie < Computer
+  private
+
   def set_behavior
     self.behavior = Behavior.new(0.2, 0.2, 0.2, 0.2, 0.2)
   end
 end
 
 class Sonny < Computer
+  private
+
   def set_behavior
     self.behavior = Behavior.new(0, 0.25, 0, 0.5, 0.25)
   end
 end
 
 class Number5 < Computer
+  private
+
   def set_name
     self.name = 'Number 5'
   end
@@ -283,7 +279,7 @@ class Number5 < Computer
 end
 
 class RPSGame
-  attr_accessor :human, :computer
+  include Interactivable
 
   SCORE_LIMIT = 3
   HISTORY_LENGTH = 5
@@ -301,6 +297,23 @@ class RPSGame
     @human = Human.new
     @computer = Computer.create_object
   end
+
+  def play
+    system 'clear'
+    display_welcome_message
+    loop do
+      play_tournament
+      display_move_history
+      break unless play_again?
+      system 'clear'
+    end
+
+    display_goodbye_message
+  end
+
+  private
+
+  attr_reader :human, :computer
 
   def display_welcome_message
     prompt "Welcome to #{Move::VALUES_STR}! " \
@@ -322,7 +335,7 @@ class RPSGame
   def display_winner
     if human.move > computer.move
       prompt "#{human.name} won!"
-    elsif human.move < computer.move
+    elsif computer.move > human.move
       prompt "#{computer.name} won!"
     else
       prompt "It's a tie!"
@@ -332,7 +345,7 @@ class RPSGame
   def update_score
     if human.move > computer.move
       human.score += 1
-    elsif human.move < computer.move
+    elsif computer.move > human.move
       computer.score += 1
     end
   end
@@ -340,8 +353,8 @@ class RPSGame
   def display_score
     prompt(
       <<~MSG
-      The score is: #{human.score} for you,
-                       #{computer.score} for the computer.
+      The score is: #{human.score} for you, #{human.name}
+                       #{computer.score} for #{computer.name}
 
       MSG
     )
@@ -370,9 +383,9 @@ class RPSGame
 
   def display_tournament_winner
     if human.score >= SCORE_LIMIT
-      prompt "Congratulations on winning the tournament!"
+      prompt "Congratulations on winning the tournament, #{human.name}!"
     elsif computer.score >= SCORE_LIMIT
-      prompt "Computer won the tournament!"
+      prompt "#{computer.name} won the tournament!"
     end
   end
 
@@ -390,19 +403,6 @@ class RPSGame
     computer.score = 0
   end
 
-  def play
-    system 'clear'
-    display_welcome_message
-    loop do
-      play_tournament
-      display_move_history
-      break unless play_again?
-      system 'clear'
-    end
-
-    display_goodbye_message
-  end
-
   def display_move_history
     prompt "Last moves played by you, #{human.name}: " \
            "#{human.move_history[0, HISTORY_LENGTH]}"
@@ -411,5 +411,4 @@ class RPSGame
   end
 end
 
-include Interactivable
 RPSGame.new.play
