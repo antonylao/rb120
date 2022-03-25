@@ -432,7 +432,12 @@ class TTTGame
     loop do
       current_player_moves
       break if board.someone_won? || board.full?
-      clear_screen_and_display_board if human_turn?
+      if human_turn?
+        clear_screen_and_display_board
+      elsif @humans.empty?
+        clear_screen_and_display_board
+        display_next_move_message
+      end
     end
   end
 
@@ -461,6 +466,7 @@ class TTTGame
       nb_computers = input_positive_int("Choose the number of computers")
 
       break if nb_humans + nb_computers > 1
+      prompt("You need at least 2 players to play!")
     end
 
     [nb_humans, nb_computers]
@@ -794,6 +800,11 @@ class TTTGame
 
   def display_next_round_message
     prompt "Press enter to play the next round"
+    gets.chomp
+  end
+
+  def display_next_move_message
+    prompt "Press enter for #{@current_player} to play"
     gets.chomp
   end
 end
