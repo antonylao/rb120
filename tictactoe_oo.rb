@@ -1,19 +1,8 @@
-module Interactivable
-  REGEXP_STRICT_POS_INTEGER = /\A0*[1-9]+([0-9])*\z/
-  REGEXP_POS_INTEGER = /\A([0-9])+\z/
-
+module MessageFormatable
   private
 
   def prompt(message)
     puts "=> #{message}"
-  end
-
-  def possible_choices(list, str)
-    possible_list = []
-    list.each do |elt|
-      possible_list << elt if elt.match(/\A#{Regexp.quote(str)}/)
-    end
-    possible_list
   end
 
   def joinor(array, delimiter = ', ', word = 'or')
@@ -24,6 +13,23 @@ module Interactivable
     else
       array[0..-2].join(delimiter) + "#{delimiter}#{word} #{array.last}"
     end
+  end
+end
+
+module Inputable
+  include MessageFormatable
+
+  REGEXP_STRICT_POS_INTEGER = /\A0*[1-9]+([0-9])*\z/
+  REGEXP_POS_INTEGER = /\A([0-9])+\z/
+
+  private
+
+  def possible_choices(list, str)
+    possible_list = []
+    list.each do |elt|
+      possible_list << elt if elt.match(/\A#{Regexp.quote(str)}/)
+    end
+    possible_list
   end
 
   def input_formatted
@@ -61,9 +67,7 @@ module Interactivable
     input_regexp_condition(REGEXP_STRICT_POS_INTEGER, msg).to_i
   end
 
-  # rubocop: disable Metrics/MethodLength
-  def input_choice(arr,
-                   choice_msg = "Please choose",
+  def input_choice(arr, choice_msg = "Please choose",
                    display_choices: true, downcase_input: true)
 
     choice_msg = "#{choice_msg.strip} #{joinor(arr)}" if display_choices
@@ -74,58 +78,54 @@ module Interactivable
       return str if arr.include?(str)
 
       list_possibles = possible_choices(arr, str)
-      case list_possibles.size
-      when 0, arr.size then prompt("Sorry, invalid choice.")
-      when 1 then return list_possibles.first
-      else prompt("Do you mean #{joinor(list_possibles)}?")
-      end
+      return list_possibles.first if list_possibles.size == 1
+      display_error_input_choice(arr.size, list_possibles.size)
     end
   end
-  # rubocop: enable Metrics/MethodLength
+
+  def display_error_input_choice(nb_of_choices, list_possibles_size)
+    case list_possibles_size
+    when 0, nb_of_choices then prompt("Sorry, invalid choice.")
+    else prompt("Do you mean #{joinor(list_possibles)}?")
+    end
+  end
 end
 
-module Gridable
-  def draw
-    index_square = self.class::BEGINNING_INDEX
-    grid_size.times do
-      display_square_line(index_square)
-      index_square += grid_size
-    end
-  end
-
-  private
-
+module SquareGridLinable
   def nb_of_squares
-    grid_size**2
+    square_grid_dim**2
   end
 
   def line_keys_arr
     horizontal_line_keys_arr +
-    vertical_line_keys_arr +
-    diagonal_line_keys_arr
+      vertical_line_keys_arr +
+      diagonal_line_keys_arr
   end
 
-  # rubocop: disable Metrics/AbcSize
   def center_square_keys_arr
-    if grid_size.odd?
-      [(nb_of_squares / 2) + self.class::BEGINNING_INDEX]
-    else
-      beginning_index1 = ((nb_of_squares - grid_size) / 2) +
-                         self.class::BEGINNING_INDEX - 1
-      beginning_index2 = ((nb_of_squares + grid_size) / 2) +
-                         self.class::BEGINNING_INDEX - 1
-      [beginning_index1, beginning_index1 + 1,
-       beginning_index2, beginning_index2 + 1]
-    end
+    return grid_one_center_square_key_arr if square_grid_dim.odd?
+    grid_four_center_square_keys_arr
   end
-  # rubocop: enable Metrics/AbcSize
+
+  def grid_one_center_square_key_arr
+    [(nb_of_squares / 2) + self.class::BEGINNING_INDEX]
+  end
+
+  def grid_four_center_square_keys_arr
+    beginning_index1 = ((nb_of_squares - square_grid_dim) / 2) +
+                       self.class::BEGINNING_INDEX - 1
+    beginning_index2 = ((nb_of_squares + square_grid_dim) / 2) +
+                       self.class::BEGINNING_INDEX - 1
+    [beginning_index1, beginning_index1 + 1,
+     beginning_index2, beginning_index2 + 1]
+  end
 
   def horizontal_line_keys_arr
     index_sq = self.class::BEGINNING_INDEX
     horizontal_line_keys = []
-    grid_size.times do
-      horizontal_line_keys << (index_sq..index_sq + grid_size - 1).to_a
-      index_sq += grid_size
+    square_grid_dim.times do
+      horizontal_line_keys << (index_sq..index_sq + square_grid_dim - 1).to_a
+      index_sq += square_grid_dim
     end
 
     horizontal_line_keys
@@ -135,30 +135,56 @@ module Gridable
     horizontal_line_keys_arr.first.zip(*horizontal_line_keys_arr[1..-1])
   end
 
-  # rubocop: disable Metrics/MethodLength
   def diagonal_line_keys_arr
+    [diagonal_keys_left_to_right, diagonal_keys_right_to_left]
+  end
+
+  def diagonal_keys_left_to_right
     index_arr = 0
-    index_arr_inverted = grid_size - 1
-    diagonal_line_keys = []
-    diagonal_line_keys2 = []
+    keys = []
 
     horizontal_line_keys_arr.each do |horizontal_line|
-      diagonal_line_keys << horizontal_line[index_arr]
-      diagonal_line_keys2 << horizontal_line[index_arr_inverted]
+      keys << horizontal_line[index_arr]
       index_arr += 1
-      index_arr_inverted -= 1
     end
 
-    [diagonal_line_keys, diagonal_line_keys2]
+    keys
   end
-  # rubocop: enable Metrics/MethodLength
+
+  def diagonal_keys_right_to_left
+    index_arr = square_grid_dim - 1
+    keys = []
+
+    horizontal_line_keys_arr.each do |horizontal_line|
+      keys << horizontal_line[index_arr]
+      index_arr -= 1
+    end
+
+    keys
+  end
+end
+
+module SquareGridDisplayable
+  def nb_of_squares
+    square_grid_dim**2
+  end
+
+  def draw
+    index_square = self.class::BEGINNING_INDEX
+    square_grid_dim.times do
+      display_square_line(index_square)
+      index_square += square_grid_dim
+    end
+  end
+
+  private
 
   def square_length
     nb_of_squares.to_s.length + 3
   end
 
   def display_square_nb_line(index)
-    (grid_size - 1).times do
+    (square_grid_dim - 1).times do
       index_indicator_line = "[#{index}]".ljust(square_length)
 
       print index_indicator_line + '|'
@@ -169,11 +195,11 @@ module Gridable
   end
 
   def display_empty_line
-    puts (''.center(square_length) + '|') * (grid_size - 1)
+    puts (''.center(square_length) + '|') * (square_grid_dim - 1)
   end
 
   def display_line_with_marker(index)
-    (grid_size - 1).times do
+    (square_grid_dim - 1).times do
       marker_line = self[index].center(square_length)
       print marker_line + '|'
       index += 1
@@ -183,8 +209,7 @@ module Gridable
   end
 
   def display_separating_line
-    puts(('-' * square_length + "+") *
-         (grid_size - 1) +
+    puts(('-' * square_length + "+") * (square_grid_dim - 1) +
          ('-' * square_length))
   end
 
@@ -199,11 +224,13 @@ module Gridable
 end
 
 class Board
-  include Gridable
-  BEGINNING_INDEX = 0
+  include SquareGridLinable
+  include SquareGridDisplayable
 
-  def dup
-    board_dup = super
+  BEGINNING_INDEX = 1
+
+  def deep_dup
+    board_dup = dup
 
     duplicate_squares = @squares.dup.transform_values do |sq|
       sq = sq.dup
@@ -292,7 +319,7 @@ class Board
     markers.uniq.size == 1
   end
 
-  def grid_size
+  def square_grid_dim
     @squares_per_side
   end
 
@@ -324,7 +351,7 @@ class Square
 end
 
 class Player
-  include Interactivable
+  include Inputable
 
   attr_reader :score, :name
   attr_accessor :marker
@@ -348,24 +375,16 @@ class Player
   end
 
   def input_and_set_name
-    # rubocop: disable Layout/FirstArgumentIndentation, Layout/ClosingParenthesisIndentation
-    new_name = input_regexp_condition(
-                /\A\S+(.*\S+)*\z/,
-                "Choose a name for #{name}"
-               )
-    # rubocop: enable Layout/FirstArgumentIndentation, Layout/ClosingParenthesisIndentation
+    input_msg = "Choose a name for #{name}"
+    new_name = input_regexp_condition(/\A\S+(.*\S+)*\z/, input_msg)
     @name = new_name
   end
 
   def input_and_set_marker(forbidden_markers)
     new_marker = nil
+    input_msg = "Choose a marker for #{name}"
     loop do
-      # rubocop: disable Layout/FirstArgumentIndentation, Layout/ClosingParenthesisIndentation
-      new_marker = input_regexp_condition(
-                    /\A\S\z/,
-                    "Choose a marker for #{name}"
-                   )
-      # rubocop: enable Layout/FirstArgumentIndentation, Layout/ClosingParenthesisIndentation
+      new_marker = input_regexp_condition(/\A\S\z/, input_msg)
       break unless forbidden_markers.include?(new_marker)
       prompt "Sorry, the marker is already taken"
     end
@@ -375,11 +394,12 @@ class Player
 end
 
 class TTTGame
-  include Interactivable
+  include Inputable
 
   CLASSIC_MARKERS = ['X', 'O']
   SCORE_LIMIT = 3
 
+  MINIMAX = true
   MINIMAX_VAL_WIN = 1
   MINIMAX_VAL_LOSS = -1
   MINIMAX_VAL_TIE = 0
@@ -445,7 +465,7 @@ class TTTGame
     if human_turn?
       human_moves
     else
-      computer_moves(minimax: true)
+      computer_moves(minimax: MINIMAX)
     end
     switch_player
   end
@@ -478,14 +498,14 @@ class TTTGame
       @humans << Player.new("Human #{nb}", marker)
     end
 
-    # rubocop: disable Style/GuardClause
-    unless default_param
-      @humans.each do |human|
-        human.input_and_set_name
-        human.input_and_set_marker(player_markers)
-      end
+    return if default_param
+
+    @humans.each do |human|
+      human.input_and_set_name
+      human.input_and_set_marker(player_markers)
     end
-    # rubocop: enable Style/GuardClause
+
+    nil
   end
 
   def add_computers(nb_computers, default_param)
@@ -494,14 +514,13 @@ class TTTGame
       @computers << Player.new("Computer #{nb}", marker)
     end
 
-    # rubocop: disable Style/GuardClause
-    unless default_param
-      @computers.each do |computer|
-        computer.input_and_set_name
-        computer.marker = random_new_marker
-      end
+    return if default_param
+    @computers.each do |computer|
+      computer.input_and_set_name
+      computer.marker = random_new_marker
     end
-    # rubocop: enable Style/GuardClause
+
+    nil
   end
 
   def add_players
@@ -566,30 +585,21 @@ class TTTGame
   end
 
   def choose_order
-    # rubocop: disable Layout/ClosingParenthesisIndentation, Layout/FirstArgumentIndentation
-    @player_order = case input_choice(
-                     ['humans', 'computers', 'random'],
-                     "Choose who goes first:"
-                    )
+    @player_order = case input_choice(['humans', 'computers', 'random'],
+                                      "Choose who goes first:")
                     when 'humans'    then @humans + @computers
                     when 'computers' then @computers + @humans
                     when 'random'    then (@humans + @computers).shuffle
                     end
-    # rubocop: enable Layout/ClosingParenthesisIndentation, Layout/FirstArgumentIndentation
 
     @first_player = @player_order.first
     @current_player = @first_player
   end
 
   def choose_board_size
-    # rubocop: disable Layout/ClosingParenthesisIndentation, Layout/FirstArgumentIndentation
-    grid_size = input_regexp_condition(
-                 Interactivable::REGEXP_STRICT_POS_INTEGER,
-                 "How many squares do you want per side?"
-                )
-    # rubocop: enable Layout/ClosingParenthesisIndentation, Layout/FirstArgumentIndentation
-
-    @board = Board.new(grid_size.to_i)
+    input_msg = "How many squares do you want per side?"
+    board_dim = input_strict_positive_int(input_msg)
+    @board = Board.new(board_dim.to_i)
   end
 
   def tournament_winner?
@@ -610,36 +620,37 @@ class TTTGame
   def human_moves
     prompt "next players: #{next_players_str}"
 
-    # rubocop: disable Layout/ClosingParenthesisIndentation, Layout/FirstArgumentIndentation
-    square = input_choice(
-              board.unmarked_keys.map(&:to_s),
-              "#{@current_player}, choose a square:"
-             ).to_i
-    # rubocop: enable Layout/ClosingParenthesisIndentation, Layout/FirstArgumentIndentation
+    input_msg = "#{@current_player}, choose a square:"
+    choices = board.unmarked_keys.map(&:to_s)
+    square = input_choice(choices, input_msg).to_i
 
     board[square] = @current_player.marker
   end
 
-  # rubocop: disable Metrics/MethodLength, Metrics/AbcSize
   def computer_moves(minimax: false)
+    chosen_square_key = if minimax
+                          minimax_key_choices.sample
+                        else
+                          offense_defense_key_choice
+                        end
+
+    board[chosen_square_key] = @current_player.marker
+  end
+
+  def offense_defense_key_choice
     offense_keys = offense_key_choices
     defense_keys = defense_key_choices
     center_keys = board.unmarked_center_keys
 
     # rubocop: disable Style/EmptyCaseCondition
-    chosen_square_key =
-      case
-      when minimax then minimax_key_choices.sample
-      when !offense_keys.empty? then offense_keys.sample
-      when !defense_keys.empty? then defense_keys.sample
-      when !center_keys.empty? then center_keys.sample
-      else board.unmarked_keys.sample
-      end
+    case
+    when !offense_keys.empty? then offense_keys.sample
+    when !defense_keys.empty? then defense_keys.sample
+    when !center_keys.empty? then center_keys.sample
+    else board.unmarked_keys.sample
+    end
     # rubocop: enable Style/EmptyCaseCondition
-
-    board[chosen_square_key] = @current_player.marker
   end
-  # rubocop: enable Metrics/MethodLength, Metrics/AbcSize
 
   def minimax_key_choices
     minimax_results = Hash.new { |hash, key| hash[key] = [] }
@@ -666,7 +677,7 @@ class TTTGame
   end
 
   def hypotethical_move_game_state(board, square_key, player_turn)
-    new_board = board.dup
+    new_board = board.deep_dup
     new_board[square_key] = player_turn.marker
     player_turn = next_player(player_turn)
 
