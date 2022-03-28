@@ -79,12 +79,12 @@ module Inputable
 
       list_possibles = possible_choices(arr, str)
       return list_possibles.first if list_possibles.size == 1
-      display_error_input_choice(arr.size, list_possibles.size)
+      display_error_input_choice(arr.size, list_possibles)
     end
   end
 
-  def display_error_input_choice(nb_of_choices, list_possibles_size)
-    case list_possibles_size
+  def display_error_input_choice(nb_of_choices, list_possibles)
+    case list_possibles.size
     when 0, nb_of_choices then prompt("Sorry, invalid choice.")
     else prompt("Do you mean #{joinor(list_possibles)}?")
     end
