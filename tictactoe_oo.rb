@@ -19,7 +19,7 @@ end
 module Inputable
   include MessageFormatable
 
-  REGEXP_STRICT_POS_INTEGER = /\A0*[1-9]+([0-9])*\z/
+  REGEXP_STRICT_POS_INTEGER = /\A0*[1-9]([0-9])*\z/
   REGEXP_POS_INTEGER = /\A([0-9])+\z/
 
   private
