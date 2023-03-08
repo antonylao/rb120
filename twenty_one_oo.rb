@@ -282,12 +282,12 @@ class Game
   end
 
   def result
-    if @player.busted? || @dealer.total < @player.total
-      return :dealer_win
-    elsif @dealer.busted? || @player.total < @dealer.total
-      return :player_win
-    else
-      return :tie
+    case
+    when @player.busted? then :dealer_win
+    when @dealer.busted? then :player_win
+    when @dealer.total > @player.total then :dealer_win
+    when @player.total > @dealer.total then :player_win
+    else :tie
     end
   end
 end
